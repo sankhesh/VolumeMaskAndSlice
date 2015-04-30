@@ -4,8 +4,10 @@
 // VTK includes
 #include <vtkCamera.h>
 #include <vtkColorTransferFunction.h>
+#include <vtkCylinder.h>
 #include <vtkGPUVolumeRayCastMapper.h>
 #include <vtkImageData.h>
+#include <vtkImageReslice.h>
 #include <vtkInteractorStyleTrackballCamera.h>
 #include <vtkNew.h>
 #include <vtkPiecewiseFunction.h>
@@ -15,7 +17,9 @@
 #include <vtkRTAnalyticSource.h>
 #include <vtkVolume.h>
 #include <vtkVolumeProperty.h>
-#include <vtkCylinder.h>
+#include <vtkMatrix4x4.h>
+#include <vtkImageActor.h>
+#include <vtkImageMapper3D.h>
 
 int main(int, char**)
 {
@@ -27,13 +31,17 @@ int main(int, char**)
   wavelet->SetCenter(0.0, 0.0, 0.0);
   wavelet->Update();
 
-  int dims[3];
+  double origin[3], spacing[3];
+  int dims[3], extent[6];
+  wavelet->GetOutput()->GetOrigin(origin);
+  wavelet->GetOutput()->GetSpacing(spacing);
   wavelet->GetOutput()->GetDimensions(dims);
+  wavelet->GetOutput()->GetExtent(extent);
 
   vtkNew<vtkImageData> mask;
-  mask->SetExtent(wavelet->GetOutput()->GetExtent());
-  mask->SetOrigin(wavelet->GetOutput()->GetOrigin());
-  mask->SetSpacing(wavelet->GetOutput()->GetSpacing());
+  mask->SetExtent(extent);
+  mask->SetOrigin(origin);
+  mask->SetSpacing(spacing);
   mask->SetDimensions(dims);
   mask->AllocateScalars(VTK_UNSIGNED_CHAR, 1);
 
@@ -41,6 +49,11 @@ int main(int, char**)
 
   double radius = dims[0]/2.0 - 10;
 
+  double center[3];
+  for (int i = 0; i < 3; ++i)
+    {
+    center[i] = origin[i] + spacing[i] * 0.5 * (extent[2*i] + extent[2*i+1]);
+    }
   vtkNew<vtkCylinder> cylinder;
   cylinder->SetCenter(mask->GetCenter());
   cylinder->SetRadius(radius);
@@ -54,20 +67,50 @@ int main(int, char**)
         if (cylinder->vtkImplicitFunction::EvaluateFunction(x,y,z) > 0)
           {
           // point is outide cylinder
-          *ptr++ = 255;
+          *ptr++ = 0;
           }
         else
           {
-          *ptr++ = 0;
+          *ptr++ = 255;
           }
         }
       }
     }
 
+  double elements[16] = {
+    0, 0,-1, 0,
+    1, 0, 0, 0,
+    0,-1, 0, 0,
+    0, 0, 0, 1};
+
+  vtkNew<vtkMatrix4x4> resliceAxes;
+  resliceAxes->DeepCopy(elements);
+
+  vtkNew<vtkImageReslice> reslice;
+  reslice->SetInputConnection(wavelet->GetOutputPort());
+  reslice->SetOutputDimensionality(2);
+  reslice->SetResliceAxesDirectionCosines( 1, 0, 0,
+                                           0,-1, 0,
+                                           0, 0,-1);
+  reslice->SetResliceAxesOrigin(mask->GetCenter());
+  reslice->SetInterpolationModeToLinear();
+  reslice->Update();
+
+  vtkNew<vtkImageData> reslicedWavelet;
+  reslicedWavelet->DeepCopy(reslice->GetOutput());
+
+  reslice->SetInputData(mask.GetPointer());
+  reslice->Update();
+  vtkNew<vtkImageData> reslicedMask;
+  reslicedMask->DeepCopy(reslice->GetOutput());
+
+  vtkNew<vtkImageActor> slice;
+  slice->GetMapper()->SetInputData(reslicedWavelet.GetPointer());
 
   vtkNew<vtkGPUVolumeRayCastMapper> volumeMapper;
   volumeMapper->SetInputConnection(wavelet->GetOutputPort());
   volumeMapper->SetMaskInput(mask.GetPointer());
+  volumeMapper->SetMaskTypeToBinary();
 
   vtkNew<vtkVolumeProperty> volumeProperty;
   vtkNew<vtkColorTransferFunction> ctf;
@@ -96,6 +139,7 @@ int main(int, char**)
   renWin->AddRenderer(ren.GetPointer());
 
   ren->AddVolume(volume.GetPointer());
+  ren->AddActor(slice.GetPointer());
   ren->ResetCamera();
 
   renWin->Render();
