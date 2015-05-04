@@ -25,16 +25,10 @@
 #include <vtkVolumeProperty.h>
 #include <vtkXMLImageDataReader.h>
 
-int main(int argc, char* argv[])
+int main(int, char**)
 {
-  if (argc < 2)
-    {
-    std::cerr << "Usage: " << argv[0] << " <input (*.vti)>" << std::endl;
-    return EXIT_FAILURE;
-    }
-
   vtkNew<vtkXMLImageDataReader> reader;
-  reader->SetFileName(argv[1]);
+  reader->SetFileName("Data/CTHead.vti");
   reader->Update();
 
   double origin[3], spacing[3];
