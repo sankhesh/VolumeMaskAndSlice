@@ -59,7 +59,7 @@ int main(int argc, char* argv[])
 
   char * ptr = static_cast<char *> (mask->GetScalarPointer(0,0,0));
 
-  double radius = dims[0]/2.0 - 40;
+  double radius = dims[0]/2.0 - 50;
 
   vtkNew<vtkCylinder> cylinder;
   cylinder->SetCenter(center);
@@ -112,28 +112,17 @@ int main(int argc, char* argv[])
   vtkNew<vtkImageData> reslicedMask;
   reslicedMask->DeepCopy(reslice->GetOutput());
 
-  vtkNew<vtkImageCast> cast;
-  cast->SetInputData(reslicedMask.GetPointer());
-  cast->SetOutputScalarType(reslicedVolume->GetScalarType());
-  cast->Update();
+  vtkNew<vtkImageShiftScale> shiftScale;
+  shiftScale->SetInputData(reslicedMask.GetPointer());
+  shiftScale->SetShift(0.0);
+  shiftScale->SetScale(1/255.0);
+  shiftScale->SetOutputScalarType(reslicedVolume->GetScalarType());
+  shiftScale->Update();
 
   vtkNew<vtkImageMathematics> imMath;
   imMath->SetInput1Data(reslicedVolume.GetPointer());
-  imMath->SetInput2Data(cast->GetOutput());
+  imMath->SetInput2Data(shiftScale->GetOutput());
   imMath->SetOperationToMultiply();
-  imMath->Update();
-  vtkImageData* mathOutput = imMath->GetOutput();
-
-  double originalRange[2], newRange[2];
-  reslicedVolume->GetScalarRange(originalRange);
-  mathOutput->GetScalarRange(newRange);
-  double scale = originalRange[1] / newRange[1];
-
-  vtkNew<vtkImageShiftScale> shiftScale;
-  shiftScale->SetInputConnection(imMath->GetOutputPort());
-  shiftScale->SetShift(0.0);
-  shiftScale->SetScale(scale);
-  shiftScale->SetOutputScalarType(reslicedVolume->GetScalarType());
 
   vtkNew<vtkGPUVolumeRayCastMapper> volumeMapper;
   volumeMapper->SetInputConnection(reader->GetOutputPort());
@@ -152,7 +141,6 @@ int main(int argc, char* argv[])
 
   vtkNew<vtkPiecewiseFunction> pwf;
   pwf->AddPoint(0.0, 0.0);
-  //pwf->AddPoint(1479.69, 0.139);
   pwf->AddPoint(3272, 1);
 
   volumeProperty->SetColor(ctf.GetPointer());
@@ -163,7 +151,6 @@ int main(int argc, char* argv[])
   volume->SetProperty(volumeProperty.GetPointer());
 
   vtkNew<vtkImageMapToColors> lut;
-  //lut->SetInputData(reslicedVolume.GetPointer());
   lut->SetInputConnection(imMath->GetOutputPort());
   lut->SetLookupTable(ctf.GetPointer());
 
@@ -179,9 +166,11 @@ int main(int argc, char* argv[])
 
   vtkNew<vtkRenderer> ren1;
   ren1->SetViewport(0,0,0.5,1);
+  ren1->SetBackground(0.31,0.34,0.43);
   renWin->AddRenderer(ren1.GetPointer());
   vtkNew<vtkRenderer> ren2;
   ren2->SetViewport(0.5,0,1,1);
+  ren2->SetBackground(0.31,0.34,0.43);
   renWin->AddRenderer(ren2.GetPointer());
 
   ren1->AddVolume(volume.GetPointer());
