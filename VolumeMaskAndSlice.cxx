@@ -129,6 +129,8 @@ int main(int, char**)
   imMath->SetOperationToMultiply();
 
   // Create the GPU mapper and set the mask on it
+  vtkNew<vtkGPUVolumeRayCastMapper> originalVolumeMapper;
+  originalVolumeMapper->SetInputConnection(reader->GetOutputPort());
   vtkNew<vtkGPUVolumeRayCastMapper> volumeMapper;
   volumeMapper->SetInputConnection(reader->GetOutputPort());
   volumeMapper->SetMaskInput(mask.GetPointer());
@@ -153,6 +155,9 @@ int main(int, char**)
   volumeProperty->SetColor(ctf.GetPointer());
   volumeProperty->SetScalarOpacity(pwf.GetPointer());
 
+  vtkNew<vtkVolume> originalVolume;
+  originalVolume->SetMapper(originalVolumeMapper.GetPointer());
+  originalVolume->SetProperty(volumeProperty.GetPointer());
   vtkNew<vtkVolume> volume;
   volume->SetMapper(volumeMapper.GetPointer());
   volume->SetProperty(volumeProperty.GetPointer());
@@ -161,9 +166,14 @@ int main(int, char**)
   vtkNew<vtkImageMapToColors> lut;
   lut->SetInputConnection(imMath->GetOutputPort());
   lut->SetLookupTable(ctf.GetPointer());
+  vtkNew<vtkImageMapToColors> originalLut;
+  originalLut->SetInputData(reslicedVolume.GetPointer());
+  originalLut->SetLookupTable(ctf.GetPointer());
 
   vtkNew<vtkImageActor> slice;
   slice->GetMapper()->SetInputConnection(lut->GetOutputPort());
+  vtkNew<vtkImageActor> originalSlice;
+  originalSlice->GetMapper()->SetInputConnection(originalLut->GetOutputPort());
 
   // Create an outline for the volume
   vtkNew<vtkOutlineFilter> outline;
@@ -176,25 +186,41 @@ int main(int, char**)
   // Render
   vtkNew<vtkRenderWindow> renWin;
   renWin->SetSize(600,600);
+  renWin->SetMultiSamples(0);
   vtkNew<vtkRenderWindowInteractor> iren;
   iren->SetRenderWindow(renWin.GetPointer());
   vtkNew<vtkInteractorStyleTrackballCamera> style;
   iren->SetInteractorStyle(style.GetPointer());
 
   vtkNew<vtkRenderer> ren1;
-  ren1->SetViewport(0,0,0.5,1);
+  ren1->SetViewport(0,0.5,0.5,1);
   ren1->SetBackground(0.31,0.34,0.43);
   renWin->AddRenderer(ren1.GetPointer());
   vtkNew<vtkRenderer> ren2;
-  ren2->SetViewport(0.5,0,1,1);
+  ren2->SetViewport(0.5,0.5,1,1);
   ren2->SetBackground(0.31,0.34,0.43);
   renWin->AddRenderer(ren2.GetPointer());
+  vtkNew<vtkRenderer> ren3;
+  ren3->SetViewport(0, 0, 0.5, 0.5);
+  ren3->SetBackground(0.31,0.34,0.43);
+  renWin->AddRenderer(ren3.GetPointer());
+  vtkNew<vtkRenderer> ren4;
+  ren4->SetViewport(0.5,0,1,0.5);
+  ren4->SetBackground(0.31,0.34,0.43);
+  renWin->AddRenderer(ren4.GetPointer());
 
-  ren1->AddVolume(volume.GetPointer());
+  ren1->AddVolume(originalVolume.GetPointer());
   ren1->AddActor(outlineActor.GetPointer());
   ren1->ResetCamera();
-  ren2->AddActor(slice.GetPointer());
+  ren2->AddVolume(volume.GetPointer());
+  ren2->AddActor(outlineActor.GetPointer());
   ren2->ResetCamera();
+  ren1->SetActiveCamera(ren2->GetActiveCamera());
+  ren3->AddActor(originalSlice.GetPointer());
+  ren3->ResetCamera();
+  ren4->AddActor(slice.GetPointer());
+  ren4->ResetCamera();
+  ren4->SetActiveCamera(ren3->GetActiveCamera());
 
   renWin->Render();
   iren->Initialize();
