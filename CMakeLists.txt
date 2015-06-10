@@ -5,7 +5,14 @@ PROJECT(VolumeMaskAndSlice)
 find_package(VTK REQUIRED)
 include(${VTK_USE_FILE})
 
-add_executable(${PROJECT_NAME} MACOSX_BUNDLE ${PROJECT_NAME}.cxx)
+set (${PROJECT_NAME}_SRCS
+  ${PROJECT_NAME}.cxx
+  vtkColorTransferFunctionOpacity.cxx
+  vtkColorTransferFunctionOpacity.h
+  )
+
+add_executable(${PROJECT_NAME} MACOSX_BUNDLE
+  ${${PROJECT_NAME}_SRCS})
 
 if(VTK_LIBRARIES)
   target_link_libraries(${PROJECT_NAME} ${VTK_LIBRARIES})
