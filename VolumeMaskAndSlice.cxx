@@ -27,6 +27,11 @@
 #include <vtkVolume.h>
 #include <vtkVolumeProperty.h>
 #include <vtkXMLImageDataReader.h>
+#include <vtkImageCanvasSource2D.h>
+#include <vtkImageBlend.h>
+#include <vtkOrientationMarkerWidget.h>
+#include <vtkAxesActor.h>
+#include <vtkPNGWriter.h>
 
 int main(int, char**)
 {
@@ -166,14 +171,66 @@ int main(int, char**)
   vtkNew<vtkImageMapToColors> lut;
   lut->SetInputConnection(imMath->GetOutputPort());
   lut->SetLookupTable(ctf.GetPointer());
+  lut->Update();
   vtkNew<vtkImageMapToColors> originalLut;
   originalLut->SetInputData(reslicedVolume.GetPointer());
   originalLut->SetLookupTable(ctf.GetPointer());
 
+  // Image Canvas for drawing circles on top of slices
+  int slice_extent[3];
+  reslicedVolume->GetDimensions(slice_extent);
+
+  int circle1_center[2], circle2_center[2];
+  int circle_radius = 20;
+  for (int i = 0; i < 2; ++i)
+    {
+    circle1_center[i] = (/*slice_extent[2*i+1] +*/ slice_extent[i])/3.0;
+    circle2_center[i] = (/*slice_extent[2*i+1] +*/ slice_extent[i])*2.0/3.0;
+    }
+  std::cout << slice_extent[0] << " " << slice_extent[1] << " " <<
+    slice_extent[2] << " " << slice_extent[3] << std::endl;
+  std::cout << circle2_center[0] << " " << circle2_center[1] << std::endl;
+
+  vtkNew<vtkImageCanvasSource2D> drawing;
+  drawing->SetNumberOfScalarComponents(
+    lut->GetOutput()->GetNumberOfScalarComponents());
+  drawing->SetScalarType(lut->GetOutput()->GetScalarType());
+  drawing->SetExtent(0, 255,
+                     0, 255,
+                     1,1);
+  drawing->DrawImage(0,0, lut->GetOutput());
+//  drawing->SetDrawColor(0.0, 0.0, 0.0);
+//  drawing->FillBox(slice_extent[0],
+//                   slice_extent[1],
+//                   slice_extent[2],
+//                   slice_extent[3]);
+  drawing->SetDrawColor(255.0, 255.0, 255.0, 255.0);
+  drawing->DrawCircle(circle1_center[0], circle1_center[1], circle_radius);
+  drawing->DrawCircle(circle2_center[0], circle2_center[1], circle_radius);
+
+  vtkNew<vtkImageBlend> blend;
+  blend->AddInputConnection(lut->GetOutputPort());
+  blend->AddInputConnection(drawing->GetOutputPort());
+  blend->SetOpacity(0, 0.5);
+  blend->SetOpacity(1, 1.0);
+
   vtkNew<vtkImageActor> slice;
-  slice->GetMapper()->SetInputConnection(lut->GetOutputPort());
+  slice->GetMapper()->SetInputConnection(drawing->GetOutputPort());
   vtkNew<vtkImageActor> originalSlice;
   originalSlice->GetMapper()->SetInputConnection(originalLut->GetOutputPort());
+
+  vtkNew<vtkPNGWriter> writer;
+  writer->SetInputConnection(drawing->GetOutputPort());
+  writer->SetFileName("drawing.png");
+  writer->Write();
+
+  writer->SetInputConnection(lut->GetOutputPort());
+  writer->SetFileName("lut.png");
+  writer->Write();
+
+  writer->SetInputConnection(imMath->GetOutputPort());
+  writer->SetFileName("imMath.png");
+  writer->Write();
 
   // Create an outline for the volume
   vtkNew<vtkOutlineFilter> outline;
@@ -206,7 +263,7 @@ int main(int, char**)
   renWin->AddRenderer(ren3.GetPointer());
   vtkNew<vtkRenderer> ren4;
   ren4->SetViewport(0.5,0,1,0.5);
-  ren4->SetBackground(0.31,0.34,0.43);
+  //ren4->SetBackground(0.31,0.34,0.43);
   renWin->AddRenderer(ren4.GetPointer());
 
   ren1->AddVolume(originalVolume.GetPointer());
@@ -221,6 +278,14 @@ int main(int, char**)
   ren4->AddActor(slice.GetPointer());
   ren4->ResetCamera();
   ren4->SetActiveCamera(ren3->GetActiveCamera());
+
+  // Orientation marker
+  vtkNew<vtkAxesActor> axes;
+  vtkNew<vtkOrientationMarkerWidget> widget;
+  widget->SetOrientationMarker(axes.GetPointer());
+  widget->SetInteractor(iren.GetPointer());
+  widget->SetEnabled(1);
+  widget->InteractiveOn();
 
   renWin->Render();
   iren->Initialize();
