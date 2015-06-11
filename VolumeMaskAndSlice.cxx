@@ -28,6 +28,8 @@
 #include <vtkVolumeProperty.h>
 #include <vtkXMLImageDataReader.h>
 
+#include "vtkImageMapToRGBA.h"
+
 int main(int, char**)
 {
   // Read the Volume file from the Data directory next to exe file
@@ -163,15 +165,16 @@ int main(int, char**)
   volume->SetProperty(volumeProperty.GetPointer());
 
   // Use the same color function for slice
-  vtkNew<vtkImageMapToColors> lut;
-  lut->SetInputConnection(imMath->GetOutputPort());
-  lut->SetLookupTable(ctf.GetPointer());
+  vtkNew<vtkImageMapToRGBA> ctfop;
+  ctfop->SetInputConnection(imMath->GetOutputPort());
+  ctfop->SetColorFunction(ctf.GetPointer());
+  ctfop->SetOpacityFunction(pwf.GetPointer());
   vtkNew<vtkImageMapToColors> originalLut;
   originalLut->SetInputData(reslicedVolume.GetPointer());
   originalLut->SetLookupTable(ctf.GetPointer());
 
   vtkNew<vtkImageActor> slice;
-  slice->GetMapper()->SetInputConnection(lut->GetOutputPort());
+  slice->GetMapper()->SetInputConnection(ctfop->GetOutputPort());
   vtkNew<vtkImageActor> originalSlice;
   originalSlice->GetMapper()->SetInputConnection(originalLut->GetOutputPort());
 
@@ -194,19 +197,19 @@ int main(int, char**)
 
   vtkNew<vtkRenderer> ren1;
   ren1->SetViewport(0,0.5,0.5,1);
-  ren1->SetBackground(0.31,0.34,0.43);
+  //ren1->SetBackground(0.31,0.34,0.43);
   renWin->AddRenderer(ren1.GetPointer());
   vtkNew<vtkRenderer> ren2;
   ren2->SetViewport(0.5,0.5,1,1);
-  ren2->SetBackground(0.31,0.34,0.43);
+  //ren2->SetBackground(0.31,0.34,0.43);
   renWin->AddRenderer(ren2.GetPointer());
   vtkNew<vtkRenderer> ren3;
   ren3->SetViewport(0, 0, 0.5, 0.5);
-  ren3->SetBackground(0.31,0.34,0.43);
+  //ren3->SetBackground(0.31,0.34,0.43);
   renWin->AddRenderer(ren3.GetPointer());
   vtkNew<vtkRenderer> ren4;
   ren4->SetViewport(0.5,0,1,0.5);
-  ren4->SetBackground(0.31,0.34,0.43);
+  //ren4->SetBackground(0.31,0.34,0.43);
   renWin->AddRenderer(ren4.GetPointer());
 
   ren1->AddVolume(originalVolume.GetPointer());

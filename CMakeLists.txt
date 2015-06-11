@@ -7,8 +7,8 @@ include(${VTK_USE_FILE})
 
 set (${PROJECT_NAME}_SRCS
   ${PROJECT_NAME}.cxx
-  vtkColorTransferFunctionOpacity.cxx
-  vtkColorTransferFunctionOpacity.h
+  vtkImageMapToRGBA.cxx
+  vtkImageMapToRGBA.h
   )
 
 add_executable(${PROJECT_NAME} MACOSX_BUNDLE
