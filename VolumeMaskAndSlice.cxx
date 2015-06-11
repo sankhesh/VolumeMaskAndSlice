@@ -165,16 +165,22 @@ int main(int, char**)
   volume->SetProperty(volumeProperty.GetPointer());
 
   // Use the same color function for slice
-  vtkNew<vtkImageMapToRGBA> ctfop;
-  ctfop->SetInputConnection(imMath->GetOutputPort());
-  ctfop->SetColorFunction(ctf.GetPointer());
-  ctfop->SetOpacityFunction(pwf.GetPointer());
+  // but a new opacity function to mask background
+  vtkNew<vtkPiecewiseFunction> pwf1;
+  pwf1->AddPoint(0.0, 0.0); // background values in data from 0.0 to 690.0
+  pwf1->AddPoint(690.0, 0.0);
+  pwf1->AddPoint(690.0, 1.0);
+  pwf1->AddPoint(3272, 1.0);
+  vtkNew<vtkImageMapToRGBA> imageMapToRGBA;
+  imageMapToRGBA->SetInputConnection(imMath->GetOutputPort());
+  imageMapToRGBA->SetColorFunction(ctf.GetPointer());
+  imageMapToRGBA->SetOpacityFunction(pwf1.GetPointer());
   vtkNew<vtkImageMapToColors> originalLut;
   originalLut->SetInputData(reslicedVolume.GetPointer());
   originalLut->SetLookupTable(ctf.GetPointer());
 
   vtkNew<vtkImageActor> slice;
-  slice->GetMapper()->SetInputConnection(ctfop->GetOutputPort());
+  slice->GetMapper()->SetInputConnection(imageMapToRGBA->GetOutputPort());
   vtkNew<vtkImageActor> originalSlice;
   originalSlice->GetMapper()->SetInputConnection(originalLut->GetOutputPort());
 
@@ -197,19 +203,15 @@ int main(int, char**)
 
   vtkNew<vtkRenderer> ren1;
   ren1->SetViewport(0,0.5,0.5,1);
-  //ren1->SetBackground(0.31,0.34,0.43);
   renWin->AddRenderer(ren1.GetPointer());
   vtkNew<vtkRenderer> ren2;
   ren2->SetViewport(0.5,0.5,1,1);
-  //ren2->SetBackground(0.31,0.34,0.43);
   renWin->AddRenderer(ren2.GetPointer());
   vtkNew<vtkRenderer> ren3;
   ren3->SetViewport(0, 0, 0.5, 0.5);
-  //ren3->SetBackground(0.31,0.34,0.43);
   renWin->AddRenderer(ren3.GetPointer());
   vtkNew<vtkRenderer> ren4;
   ren4->SetViewport(0.5,0,1,0.5);
-  //ren4->SetBackground(0.31,0.34,0.43);
   renWin->AddRenderer(ren4.GetPointer());
 
   ren1->AddVolume(originalVolume.GetPointer());
