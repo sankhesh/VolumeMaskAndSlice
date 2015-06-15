@@ -42,7 +42,6 @@ int main(int, char**)
 
   vtkNew<vtkTriangleFilter> tf;
   tf->SetInputConnection(reader->GetOutputPort());
-//  vtkSmartPointer<vtkImageData> 
 
   // Fetch volume parameters
   double origin[3], spacing[3];
@@ -69,7 +68,7 @@ int main(int, char**)
 
   char * ptr = static_cast<char *> (mask->GetScalarPointer(0,0,0));
 
-  double radius = dims[0]/2.0;
+  double radius = dims[0]/2.0 - 5.0;
 
   // Create a cylindrical implicit function centered at the center of the mask
   // and with a custom radius
@@ -104,13 +103,10 @@ int main(int, char**)
   vtkNew<vtkImageReslice> reslice;
   reslice->SetInputConnection(reader->GetOutputPort());
   reslice->SetOutputDimensionality(2);
-//  reslice->SetResliceAxesDirectionCosines( 0,-1, 0,
-//                                           0, 0,-1,
-//                                          -1, 0,0);
-  reslice->SetResliceAxesDirectionCosines( -1,0, 0,
-                                           0, -1,0,
+  reslice->SetResliceAxesDirectionCosines( 1,0, 0,
+                                           0,1,0,
                                            0,0,-1);
-  reslice->SetResliceAxesOrigin(center);
+  reslice->SetResliceAxesOrigin(18.5, 17.5, 69.3);
   reslice->SetInterpolationModeToLinear();
   reslice->Update();
 
@@ -150,19 +146,12 @@ int main(int, char**)
   volumeMapper->SetMaskTypeToBinary();
 
   // Create color transfer function
-  vtkNew<vtkVolumeProperty> volumeProperty;
   vtkNew<vtkColorTransferFunction> ctf;
   ctf->AddRGBPoint(0.0, 0.0, 1.0, 0.0);
   ctf->AddRGBPoint(255.0, 0.0, 1.0, 1.0);
-  ctf->AddRGBPoint(1096.0, 1.0, 0.0, 0.0);
-  ctf->AddRGBPoint(4458.0, 0.0, 0.0, 1.0);
-//  ctf->AddRGBPoint(0.0, 0.31, 0.34, 0.43);
-//  ctf->AddRGBPoint(556.24, 0, 0.0, 1);
-//  ctf->AddRGBPoint(1112.48, 0, 1, 1);
-//  ctf->AddRGBPoint(1636, 0, 1, 0);
-//  ctf->AddRGBPoint(2192.24, 1, 1, 0);
-//  ctf->AddRGBPoint(2748.48, 1, 0, 0);
-//  ctf->AddRGBPoint(3272, 0.88, 0, 1);
+  ctf->AddRGBPoint(1096.0, 0.7, 0.015, 0.15);
+  ctf->AddRGBPoint(2777, 0.86, 0.86, 0.86);
+  ctf->AddRGBPoint(4458, 0.23, 0.3, 0.75);
 
   // Scalar opacity function
   vtkNew<vtkPiecewiseFunction> pwf;
@@ -170,15 +159,15 @@ int main(int, char**)
   pwf->AddPoint(255.0, 1.0);
   pwf->AddPoint(1096.0, 0.0);
   pwf->AddPoint(4458.0, 1.0);
-//  pwf->AddPoint(0.0, 0.0);
-//  pwf->AddPoint(3272, 1);
 
+  // Create the volume property
+  vtkNew<vtkVolumeProperty> volumeProperty;
   volumeProperty->SetColor(ctf.GetPointer());
   volumeProperty->SetScalarOpacity(pwf.GetPointer());
+  volumeProperty->SetScalarOpacityUnitDistance(3.87);
+  volumeProperty->SetInterpolationTypeToLinear();
+  volumeProperty->ShadeOff();
 
-  vtkNew<vtkVolume> originalVolume;
-  originalVolume->SetMapper(originalVolumeMapper.GetPointer());
-  originalVolume->SetProperty(volumeProperty.GetPointer());
   vtkNew<vtkVolume> volume;
   volume->SetMapper(volumeMapper.GetPointer());
   volume->SetProperty(volumeProperty.GetPointer());
@@ -190,25 +179,17 @@ int main(int, char**)
   pwf1->AddPoint(3900.0, 0.0);
   pwf1->AddPoint(3900.0, 1.0);
   pwf1->AddPoint(4458.0, 1.0);
-//  pwf1->AddPoint(0.0, 0.0); // background values in data from 0.0 to 690.0
-//  pwf1->AddPoint(690.0, 0.0);
-//  pwf1->AddPoint(690.0, 1.0);
-//  pwf1->AddPoint(3272, 1.0);
+
   vtkNew<vtkImageMapToRGBA> imageMapToRGBA;
   imageMapToRGBA->SetInputConnection(imMath->GetOutputPort());
   imageMapToRGBA->SetColorFunction(ctf.GetPointer());
   imageMapToRGBA->SetOpacityFunction(pwf1.GetPointer());
-  vtkNew<vtkImageMapToColors> originalLut;
-  originalLut->SetInputData(reslicedVolume.GetPointer());
-  originalLut->SetLookupTable(ctf.GetPointer());
 
   vtkNew<vtkImageProperty> imProp;
   imProp->SetInterpolationTypeToNearest();
   vtkNew<vtkImageActor> slice;
   slice->GetMapper()->SetInputConnection(imageMapToRGBA->GetOutputPort());
   slice->SetProperty(imProp.GetPointer());
-  vtkNew<vtkImageActor> originalSlice;
-  originalSlice->GetMapper()->SetInputConnection(originalLut->GetOutputPort());
 
   // Create an outline for the volume
   vtkNew<vtkOutlineFilter> outline;
@@ -220,7 +201,7 @@ int main(int, char**)
 
   // Render
   vtkNew<vtkRenderWindow> renWin;
-  renWin->SetSize(600,600);
+  renWin->SetSize(800,400);
   renWin->SetMultiSamples(0);
   vtkNew<vtkRenderWindowInteractor> iren;
   iren->SetRenderWindow(renWin.GetPointer());
@@ -228,30 +209,19 @@ int main(int, char**)
   iren->SetInteractorStyle(style.GetPointer());
 
   vtkNew<vtkRenderer> ren1;
-  ren1->SetViewport(0,0.5,0.5,1);
+  ren1->SetViewport(0,0,0.5,1);
   renWin->AddRenderer(ren1.GetPointer());
   vtkNew<vtkRenderer> ren2;
-  ren2->SetViewport(0.5,0.5,1,1);
+  ren2->SetViewport(0.5,0,1,1);
   renWin->AddRenderer(ren2.GetPointer());
-  vtkNew<vtkRenderer> ren3;
-  ren3->SetViewport(0, 0, 0.5, 0.5);
-  renWin->AddRenderer(ren3.GetPointer());
-  vtkNew<vtkRenderer> ren4;
-  ren4->SetViewport(0.5,0,1,0.5);
-  renWin->AddRenderer(ren4.GetPointer());
 
-  ren1->AddVolume(originalVolume.GetPointer());
+  ren1->AddVolume(volume.GetPointer());
   ren1->AddActor(outlineActor.GetPointer());
   ren1->ResetCamera();
-  ren2->AddVolume(volume.GetPointer());
-  ren2->AddActor(outlineActor.GetPointer());
+  ren1->GetActiveCamera()->Azimuth(5);
+  ren1->GetActiveCamera()->Zoom(5);
+  ren2->AddActor(slice.GetPointer());
   ren2->ResetCamera();
-  ren1->SetActiveCamera(ren2->GetActiveCamera());
-  ren3->AddActor(originalSlice.GetPointer());
-  ren3->ResetCamera();
-  ren4->AddActor(slice.GetPointer());
-  ren4->ResetCamera();
-  ren4->SetActiveCamera(ren3->GetActiveCamera());
 
   renWin->Render();
   iren->Initialize();
