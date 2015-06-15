@@ -10,9 +10,10 @@
 #include <vtkImageActor.h>
 #include <vtkImageCast.h>
 #include <vtkImageData.h>
-#include <vtkImageMapper3D.h>
 #include <vtkImageMapToColors.h>
+#include <vtkImageMapper3D.h>
 #include <vtkImageMathematics.h>
+#include <vtkImageProperty.h>
 #include <vtkImageReslice.h>
 #include <vtkImageShiftScale.h>
 #include <vtkInteractorStyleTrackballCamera.h>
@@ -21,9 +22,11 @@
 #include <vtkOutlineFilter.h>
 #include <vtkPiecewiseFunction.h>
 #include <vtkPolyDataMapper.h>
-#include <vtkRenderer.h>
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
+#include <vtkRenderer.h>
+#include <vtkSmartPointer.h>
+#include <vtkTriangleFilter.h>
 #include <vtkVolume.h>
 #include <vtkVolumeProperty.h>
 #include <vtkXMLImageDataReader.h>
@@ -34,8 +37,12 @@ int main(int, char**)
 {
   // Read the Volume file from the Data directory next to exe file
   vtkNew<vtkXMLImageDataReader> reader;
-  reader->SetFileName("Data/CTHead.vti");
+  reader->SetFileName("Data/Volume.vti");
   reader->Update();
+
+  vtkNew<vtkTriangleFilter> tf;
+  tf->SetInputConnection(reader->GetOutputPort());
+//  vtkSmartPointer<vtkImageData> 
 
   // Fetch volume parameters
   double origin[3], spacing[3];
@@ -62,12 +69,12 @@ int main(int, char**)
 
   char * ptr = static_cast<char *> (mask->GetScalarPointer(0,0,0));
 
-  double radius = dims[0]/2.0 - 50;
+  double radius = dims[0]/2.0;
 
   // Create a cylindrical implicit function centered at the center of the mask
   // and with a custom radius
   vtkNew<vtkCylinder> cylinder;
-  cylinder->SetCenter(center);
+  cylinder->SetCenter(center[0], center[2], center[1]);
   cylinder->SetRadius(radius);
 
   // Set all values of the mask within and on the cylinder = 255 and all other
@@ -97,9 +104,12 @@ int main(int, char**)
   vtkNew<vtkImageReslice> reslice;
   reslice->SetInputConnection(reader->GetOutputPort());
   reslice->SetOutputDimensionality(2);
-  reslice->SetResliceAxesDirectionCosines( 0,-1, 0,
-                                           0, 0,-1,
-                                          -1, 0,0);
+//  reslice->SetResliceAxesDirectionCosines( 0,-1, 0,
+//                                           0, 0,-1,
+//                                          -1, 0,0);
+  reslice->SetResliceAxesDirectionCosines( -1,0, 0,
+                                           0, -1,0,
+                                           0,0,-1);
   reslice->SetResliceAxesOrigin(center);
   reslice->SetInterpolationModeToLinear();
   reslice->Update();
@@ -134,6 +144,7 @@ int main(int, char**)
   vtkNew<vtkGPUVolumeRayCastMapper> originalVolumeMapper;
   originalVolumeMapper->SetInputConnection(reader->GetOutputPort());
   vtkNew<vtkGPUVolumeRayCastMapper> volumeMapper;
+  //volumeMapper->SetInputData(mask.GetPointer());
   volumeMapper->SetInputConnection(reader->GetOutputPort());
   volumeMapper->SetMaskInput(mask.GetPointer());
   volumeMapper->SetMaskTypeToBinary();
@@ -141,18 +152,26 @@ int main(int, char**)
   // Create color transfer function
   vtkNew<vtkVolumeProperty> volumeProperty;
   vtkNew<vtkColorTransferFunction> ctf;
-  ctf->AddRGBPoint(0.0, 0.31, 0.34, 0.43);
-  ctf->AddRGBPoint(556.24, 0, 0.0, 1);
-  ctf->AddRGBPoint(1112.48, 0, 1, 1);
-  ctf->AddRGBPoint(1636, 0, 1, 0);
-  ctf->AddRGBPoint(2192.24, 1, 1, 0);
-  ctf->AddRGBPoint(2748.48, 1, 0, 0);
-  ctf->AddRGBPoint(3272, 0.88, 0, 1);
+  ctf->AddRGBPoint(0.0, 0.0, 1.0, 0.0);
+  ctf->AddRGBPoint(255.0, 0.0, 1.0, 1.0);
+  ctf->AddRGBPoint(1096.0, 1.0, 0.0, 0.0);
+  ctf->AddRGBPoint(4458.0, 0.0, 0.0, 1.0);
+//  ctf->AddRGBPoint(0.0, 0.31, 0.34, 0.43);
+//  ctf->AddRGBPoint(556.24, 0, 0.0, 1);
+//  ctf->AddRGBPoint(1112.48, 0, 1, 1);
+//  ctf->AddRGBPoint(1636, 0, 1, 0);
+//  ctf->AddRGBPoint(2192.24, 1, 1, 0);
+//  ctf->AddRGBPoint(2748.48, 1, 0, 0);
+//  ctf->AddRGBPoint(3272, 0.88, 0, 1);
 
   // Scalar opacity function
   vtkNew<vtkPiecewiseFunction> pwf;
   pwf->AddPoint(0.0, 0.0);
-  pwf->AddPoint(3272, 1);
+  pwf->AddPoint(255.0, 1.0);
+  pwf->AddPoint(1096.0, 0.0);
+  pwf->AddPoint(4458.0, 1.0);
+//  pwf->AddPoint(0.0, 0.0);
+//  pwf->AddPoint(3272, 1);
 
   volumeProperty->SetColor(ctf.GetPointer());
   volumeProperty->SetScalarOpacity(pwf.GetPointer());
@@ -167,10 +186,14 @@ int main(int, char**)
   // Use the same color function for slice
   // but a new opacity function to mask background
   vtkNew<vtkPiecewiseFunction> pwf1;
-  pwf1->AddPoint(0.0, 0.0); // background values in data from 0.0 to 690.0
-  pwf1->AddPoint(690.0, 0.0);
-  pwf1->AddPoint(690.0, 1.0);
-  pwf1->AddPoint(3272, 1.0);
+  pwf1->AddPoint(1096.0, 0.0);
+  pwf1->AddPoint(3900.0, 0.0);
+  pwf1->AddPoint(3900.0, 1.0);
+  pwf1->AddPoint(4458.0, 1.0);
+//  pwf1->AddPoint(0.0, 0.0); // background values in data from 0.0 to 690.0
+//  pwf1->AddPoint(690.0, 0.0);
+//  pwf1->AddPoint(690.0, 1.0);
+//  pwf1->AddPoint(3272, 1.0);
   vtkNew<vtkImageMapToRGBA> imageMapToRGBA;
   imageMapToRGBA->SetInputConnection(imMath->GetOutputPort());
   imageMapToRGBA->SetColorFunction(ctf.GetPointer());
@@ -179,8 +202,11 @@ int main(int, char**)
   originalLut->SetInputData(reslicedVolume.GetPointer());
   originalLut->SetLookupTable(ctf.GetPointer());
 
+  vtkNew<vtkImageProperty> imProp;
+  imProp->SetInterpolationTypeToNearest();
   vtkNew<vtkImageActor> slice;
   slice->GetMapper()->SetInputConnection(imageMapToRGBA->GetOutputPort());
+  slice->SetProperty(imProp.GetPointer());
   vtkNew<vtkImageActor> originalSlice;
   originalSlice->GetMapper()->SetInputConnection(originalLut->GetOutputPort());
 

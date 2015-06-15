@@ -11,13 +11,22 @@ set (${PROJECT_NAME}_SRCS
   vtkImageMapToRGBA.h
   )
 
+set (${PROJECT_NAME}2_SRCS
+  ${PROJECT_NAME}2.cxx
+  )
+
 add_executable(${PROJECT_NAME} MACOSX_BUNDLE
   ${${PROJECT_NAME}_SRCS})
 
+add_executable (${PROJECT_NAME}2 MACOSX_BUNDLE
+  ${${PROJECT_NAME}2_SRCS})
+
 if(VTK_LIBRARIES)
   target_link_libraries(${PROJECT_NAME} ${VTK_LIBRARIES})
+  target_link_libraries(${PROJECT_NAME}2 ${VTK_LIBRARIES})
 else()
   target_link_libraries(${PROJECT_NAME} vtkHybrid vtkWidgets)
+  target_link_libraries(${PROJECT_NAME}2 vtkHybrid vtkWidgets)
 endif()
 
 add_custom_command(
@@ -29,3 +38,4 @@ add_custom_command(
   )
 add_custom_target(copy_data ALL DEPENDS "${CMAKE_BINARY_DIR}/Data")
 add_dependencies(${PROJECT_NAME} copy_data)
+add_dependencies(${PROJECT_NAME}2 copy_data)
