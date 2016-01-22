@@ -34,13 +34,15 @@ int main(int, char**)
   reader->SetFileName("Data/Volume.vti");
   reader->Update();
 
+  vtkImageData* data = reader->GetOutput();
+
   // Fetch the data parameters
   double origin[3], spacing[3];
   int dims[3], extent[6];
-  reader->GetOutput()->GetOrigin(origin);
-  reader->GetOutput()->GetSpacing(spacing);
-  reader->GetOutput()->GetDimensions(dims);
-  reader->GetOutput()->GetExtent(extent);
+  data->GetOrigin(origin);
+  data->GetSpacing(spacing);
+  data->GetDimensions(dims);
+  data->GetExtent(extent);
 
   // Calculate center of data for cylindrical mask center
   double center[3];
@@ -70,7 +72,7 @@ int main(int, char**)
 
   // Slice the volume
   vtkNew<vtkCutter> cutter;
-  cutter->SetInputConnection(reader->GetOutputPort());
+  cutter->SetInputData(data);
   cutter->SetCutFunction(slicePlane.GetPointer());
 
   // Clip the slice with the cylindrical function
