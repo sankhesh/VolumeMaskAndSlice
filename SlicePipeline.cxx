@@ -24,7 +24,10 @@
 #include <vtkRenderWindow.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkRenderer.h>
+#include <vtkTextActor.h>
+#include <vtkTextProperty.h>
 #include <vtkTransform.h>
+#include <vtkUnstructuredGrid.h>
 #include <vtkXMLImageDataReader.h>
 
 int main(int, char**)
@@ -80,12 +83,52 @@ int main(int, char**)
   clipData->SetInputConnection(cutter->GetOutputPort());
   clipData->SetClipFunction(cylinder.GetPointer());
   clipData->InsideOutOn();
+  clipData->Update();
 
   // Create color transfer function
   vtkNew<vtkColorTransferFunction> ctf;
   ctf->AddRGBPoint(1096.0, 0.7, 0.015, 0.15);
   ctf->AddRGBPoint(2777, 0.86, 0.86, 0.86);
   ctf->AddRGBPoint(4458, 0.23, 0.3, 0.75);
+
+  // Figure out the world space locations where I want the text to be
+  vtkUnstructuredGrid* sliceGrid = clipData->GetOutput();
+  double bounds[6];
+  sliceGrid->GetBounds(bounds);
+  std::cout << bounds[0] << " " << bounds[1] << " " <<
+    bounds[2] << " " << bounds[3] << " " << bounds[4] << " " << bounds[5] << std::endl;
+
+  vtkNew<vtkTextActor> text;
+  text->SetInput("1");
+  text->GetPositionCoordinate()->SetCoordinateSystemToWorld();
+  text->GetPositionCoordinate()->SetValue(bounds[0], (bounds[2] + bounds[3])/2.0, bounds[4]);
+  text->GetPosition2Coordinate()->SetCoordinateSystemToWorld();
+  text->GetPosition2Coordinate()->SetValue(5.0, 5.0, 1.0);
+
+  vtkTextProperty* tprop = text->GetTextProperty();
+  tprop->SetFontSize(18);
+  tprop->SetFontFamilyToArial();
+  tprop->SetJustificationToCentered();
+  tprop->BoldOn();
+  tprop->ItalicOn();
+  tprop->ShadowOn();
+  tprop->SetColor(0, 0, 1);
+
+  vtkNew<vtkTextActor> text1;
+  text1->SetInput("2");
+  text1->GetPositionCoordinate()->SetCoordinateSystemToWorld();
+  text1->GetPositionCoordinate()->SetValue(bounds[1], (bounds[2] + bounds[3])/2.0, bounds[4]);
+  text1->GetPosition2Coordinate()->SetCoordinateSystemToWorld();
+  text1->GetPosition2Coordinate()->SetValue(5.0, 5.0, 1.0);
+
+  vtkTextProperty* tprop1 = text1->GetTextProperty();
+  tprop1->SetFontSize(18);
+  tprop1->SetFontFamilyToArial();
+  tprop1->SetJustificationToCentered();
+  tprop1->BoldOn();
+  tprop1->ItalicOn();
+  tprop1->ShadowOn();
+  tprop1->SetColor(1, 0, 0);
 
   // Setup the slice mapper with the color transfer function
   // NOTE: No need to set opacity here
@@ -99,6 +142,8 @@ int main(int, char**)
   // Setup the render
   vtkNew<vtkRenderer> renderer;
   renderer->AddActor(slice.GetPointer());
+  renderer->AddActor2D(text.GetPointer());
+  renderer->AddActor2D(text1.GetPointer());
   renderer->ResetCamera();
 
   vtkNew<vtkRenderWindow> renderWindow;
